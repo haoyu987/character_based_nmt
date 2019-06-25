@@ -79,8 +79,8 @@ class CharDecoder(nn.Module):
         target = char_sequence[1:]
         loss = nn.CrossEntropyLoss(ignore_index=self.padding_idx, reduction='sum')
 
-        scores = scores.view(-1, scores.shape[-1])
-        target = target.view(-1)
+        scores = scores.contiguous().view(-1, scores.shape[-1])
+        target = target.contiguous().view(-1)
 
         return loss(scores, target)
 
