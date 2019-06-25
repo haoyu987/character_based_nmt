@@ -31,9 +31,9 @@ class CharDecoder(nn.Module):
 
         self.charDecoder = nn.LSTM(char_embedding_size, hidden_size)
         V_char = len(target_vocab.char2id)
-        padding_idx = target_vocab.char2id['<pad>']
+        self.padding_idx = target_vocab.char2id['<pad>']
         self.char_output_projection = nn.Linear(hidden_size, V_char, bias=True)
-        self.decoderCharEmb = nn.Embedding(V_char, char_embedding_size, padding_idx = padding_idx)
+        self.decoderCharEmb = nn.Embedding(V_char, char_embedding_size, padding_idx = self.padding_idx)
         self.target_vocab = target_vocab
 
         ### END YOUR CODE
@@ -73,7 +73,16 @@ class CharDecoder(nn.Module):
         ###
         ### Hint: - Make sure padding characters do not contribute to the cross-entropy loss.
         ###       - char_sequence corresponds to the sequence x_1 ... x_{n+1} from the handout (e.g., <START>,m,u,s,i,c,<END>).
+        input = char_sequence[:-1]
+        scores, dec_hidden = self.forward(input, dec_hidden)
 
+        target = char_sequence[1:]
+        loss = nn.CrossEntropyLoss(ignore_index=self.padding_idx, reduction='sum')
+
+        scores = scores.view(-1, scores.shape[-1])
+        target = target.view(-1)
+
+        return loss(scores, target)
 
         ### END YOUR CODE
 
@@ -94,7 +103,30 @@ class CharDecoder(nn.Module):
         ###      - Use torch.tensor(..., device=device) to turn a list of character indices into a tensor.
         ###      - We use curly brackets as start-of-word and end-of-word characters. That is, use the character '{' for <START> and '}' for <END>.
         ###        Their indices are self.target_vocab.start_of_word and self.target_vocab.end_of_word, respectively.
-        
-        
+        output_char = []
+        start_idx = self.target_vocab.start_of_word
+        end_idx = self.target_vocab.end_of_word
+        dec_hidden = initialStates
+        _, batch_size, _ = initialStates[0].shape
+        current_char = torch.tensor([[start_idx] * batch_size], device=device)
+
+        score_list = []
+
+        for _ in range(max_length):
+            scores, dec_hidden = self.forward(current_char, dec_hidden)
+            current_char = scores.argmax(dim=2)
+            score_list.append(current_char)
+
+        char_idx_list = torch.cat(score_list).t().tolist()
+        decodeWords = []
+        for chars in char_idx_list:
+            word = ''
+            for idx in chars:
+                if idx == end_idx:
+                    break
+                word += self.target_vocab.id2char[idx]
+            decodeWords.append(word)
+
+        return decodeWords
         ### END YOUR CODE
 
